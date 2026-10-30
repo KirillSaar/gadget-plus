@@ -1,26 +1,15 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ProductController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\DB;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+Route::prefix('v1')->name('v1.')->group(function () {
 
+    // Публичные маршруты (в ПР8 здесь появятся auth и middleware по ролям)
+    Route::middleware([])->group(function () {
+        Route::apiResource('products', ProductController::class);
+        Route::apiResource('categories', CategoryController::class);
+    });
 
-
-Route::get('/health', function () {
-    try {
-        DB::select('select 1');
-        $dbOk = true;
-    } catch (\Throwable $e) {
-        $dbOk = false;
-    }
-
-    return response()->json([
-        'app' => config('app.name'),
-        'time' => now()->toIso8601String(),
-        'database' => $dbOk ? 'ok' : 'unavailable',
-    ], $dbOk ? 200 : 503);
 });
