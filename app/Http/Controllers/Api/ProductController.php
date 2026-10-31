@@ -50,15 +50,9 @@ class ProductController extends Controller
         );
     }
 
-    public function destroy(Product $product): Response|JsonResponse
+        public function destroy(Product $product): Response
     {
-        try {
-            $this->products->delete($product);
-        } catch (QueryException $e) {
-            return response()->json([
-                'message' => 'Нельзя удалить товар: он используется в заказах.',
-            ], 409);
-        }
+        $this->products->delete($product);
 
         return response()->noContent();
     }

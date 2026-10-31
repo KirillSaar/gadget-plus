@@ -47,15 +47,9 @@ class CategoryController extends Controller
         );
     }
 
-    public function destroy(Category $category): Response|JsonResponse
+        public function destroy(Category $category): Response
     {
-        try {
-            $this->categories->delete($category);
-        } catch (QueryException $e) {
-            return response()->json([
-                'message' => 'Нельзя удалить категорию: в ней есть товары.',
-            ], 409);
-        }
+        $this->categories->delete($category);
 
         return response()->noContent();
     }
