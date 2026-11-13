@@ -12,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use App\Http\Requests\ProductIndexRequest;
 
 class ProductController extends Controller
 {
@@ -19,14 +20,11 @@ class ProductController extends Controller
     {
     }
 
-    public function index(Request $request)
+        public function index(ProductIndexRequest $request)
     {
-        $items = $this->products->paginate(
-            $request->only(['category_id', 'brand_id']),
-            min($request->integer('per_page', 10), 50)
+        return ProductResource::collection(
+            $this->products->paginate($request->validated())
         );
-
-        return ProductResource::collection($items);
     }
 
     public function store(StoreProductRequest $request): JsonResponse

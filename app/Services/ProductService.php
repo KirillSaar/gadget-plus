@@ -7,13 +7,22 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ProductService
 {
-    public function paginate(array $filters = [], int $perPage = 10): LengthAwarePaginator
+    /** Белый список полей сортировки */
+    public const SORTABLE = ['id', 'name', 'price', 'created_at'];
+
+    public function paginate(array $params = []): LengthAwarePaginator
     {
+        $sort = in_array($params['sort'] ?? null, self::SORTABLE, true) ? $params['sort'] : 'id';
+        $order = ($params['order'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+        $perPage = (int) ($params['per_page'] ?? 10);
+
         return Product::with(['category', 'brand'])
-            ->when($filters['category_id'] ?? null, fn ($q, $id) => $q->where('category_id', $id))
-            ->when($filters['brand_id'] ?? null, fn ($q, $id) => $q->where('brand_id', $id))
+            ->filter($params)
+            ->search($params['search'] ?? null)
+            ->orderBy($sort, $order)
             ->orderBy('id')
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     public function create(array $data): Product

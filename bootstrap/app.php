@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\BusinessException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -38,6 +39,14 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'Ошибка валидации',
                     'errors' => $e->errors(),
                 ], 422);
+            }
+        });
+
+	$exceptions->dontReport(BusinessException::class);
+
+        $exceptions->render(function (BusinessException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json(['message' => $e->getMessage()], $e->status());
             }
         });
 
