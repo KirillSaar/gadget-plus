@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class OrderService
 {
@@ -53,7 +54,7 @@ class OrderService
      */
     public function checkout(User $user, array $data): Order
     {
-        return DB::transaction(function () use ($user, $data) {
+        $order = DB::transaction(function () use ($user, $data) {
             $cart = DB::table('product_user')->where('user_id', $user->id)->get();
 
             // Правило 1: нельзя оформить заказ с пустой корзиной
@@ -111,12 +112,21 @@ class OrderService
 
             return $order->load(['user', 'items.product']);
         });
+
+        Log::info('Заказ оформлен', [
+            'order_id' => $order->id,
+            'user_id' => $user->id,
+            'total' => $order->total,
+            'positions' => $order->items->count(),
+        ]);
+
+        return $order;
     }
 
     /** Отмена заказа с возвратом товара на склад. */
     public function cancel(Order $order): Order
     {
-        return DB::transaction(function () use ($order) {
+        $cancelled = DB::transaction(function () use ($order) {
             $order = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
             $current = $this->statusOf($order);
 
@@ -133,6 +143,10 @@ class OrderService
 
             return $order->load(['user', 'items.product']);
         });
+
+        Log::info('Заказ отменён, товары возвращены на склад', ['order_id' => $cancelled->id]);
+
+        return $cancelled;
     }
 
     /** Смена статуса (admin, manager) строго по допустимым переходам. */
@@ -142,7 +156,7 @@ class OrderService
             return $this->cancel($order);
         }
 
-        return DB::transaction(function () use ($order, $to) {
+        $updated = DB::transaction(function () use ($order, $to) {
             $order = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
             $current = $this->statusOf($order);
 
@@ -155,7 +169,15 @@ class OrderService
 
             $order->forceFill(['status' => $to->value])->save();
 
+            Log::info('Статус заказа изменён', [
+                'order_id' => $order->id,
+                'from' => $current->value,
+                'to' => $to->value,
+            ]);
+
             return $order->load(['user', 'items.product']);
         });
+
+        return $updated;
     }
 }

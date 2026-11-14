@@ -1,58 +1,92 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Интернет-магазин электроники: REST API (Laravel)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Серверная часть интернет-магазина электроники: каталог (товары, категории, бренды), корзина, заказы,
+регистрация и вход (Laravel Sanctum), роли и политики доступа, статистика.
 
-## About Laravel
+## Технологии
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+PHP 8.4, Laravel, MySQL 8.4, Laravel Sanctum, PHPUnit (SQLite в памяти для тестов), Postman.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Структура кода (слои)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Слой | Каталог | Назначение |
+|---|---|---|
+| Маршруты | `routes/api.php` | префикс `/api/v1`, группы `auth:sanctum` и `role:...` |
+| Контроллеры | `app/Http/Controllers/Api` | принимают запрос, вызывают сервис, возвращают Resource |
+| Form Request | `app/Http/Requests` | валидация входных данных (сообщения на русском) |
+| Сервисы | `app/Services` | бизнес-логика, транзакции, блокировки |
+| Модели, Enum | `app/Models`, `app/Enums` | доступ к БД, статусы заказа и роли |
+| Resource | `app/Http/Resources` | формат ответов |
+| Политики, middleware | `app/Policies`, `app/Http/Middleware` | доступ к заказам, проверка роли, журнал запросов |
+| Исключения | `app/Exceptions/BusinessException.php` | нарушение бизнес-правил (код 409) |
 
-## Learning Laravel
+## Установка и запуск
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+composer install
+copy .env.example .env
+php artisan key:generate
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+В `.env` укажите базу данных (MySQL, например `shop_laravel`) и `APP_FAKER_LOCALE=ru_RU`. Затем:
 
-## Contributing
+```
+php artisan migrate:fresh --seed
+php artisan serve
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+API будет доступен по адресу `http://127.0.0.1:8000/api/v1`.
 
-## Code of Conduct
+## Тестовые учётные записи
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Пароль у всех: `password`.
 
-## Security Vulnerabilities
+| Роль | Email | Возможности |
+|---|---|---|
+| admin | admin@shop.kz | всё, включая удаление товаров и управление категориями |
+| manager | manager@shop.kz | создание и изменение товаров, смена статусов заказов, статистика |
+| customer | customer@shop.kz | корзина, свои заказы |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Основные бизнес-правила
 
-## License
+1. Нельзя оформить заказ с пустой корзиной.
+2. Нельзя заказать (и положить в корзину) товара больше, чем есть на складе.
+3. Нельзя заказать товар, снятый с продажи.
+4. Статус заказа меняется только по цепочке: новый, оплачен, отправлен, доставлен (описано в `OrderStatus`).
+5. Отменить можно только новый или оплаченный заказ, товар возвращается на склад.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Оформление заказа выполняется в одной транзакции (`DB::transaction`, `lockForUpdate`): при ошибке изменения откатываются.
+Нарушения возвращаются кодом 409 и сообщением `{"message": "..."}`.
+
+## Автотесты
+
+Тесты используют SQLite в памяти (настроено в `phpunit.xml`), рабочая база не затрагивается.
+
+```
+php artisan test
+```
+
+Нужны PHP-расширения `pdo_sqlite` и `sqlite3`. Проверка: `php -m` (в Windows: `php -m | findstr sqlite`).
+
+## Журналирование
+
+- Каждый запрос к API пишется middleware `LogApiRequests` в `storage/logs/laravel.log`: метод, URL, id пользователя, код ответа, время выполнения. Тело запроса и заголовки не логируются, поэтому пароли и токены в журнал не попадают.
+- События бизнес-логики (оформление, отмена, смена статуса заказа) пишутся уровнем `info`, нарушения правил уровнем `warning`, непредвиденные ошибки уровнем `error`.
+
+Просмотр последних записей: `Get-Content storage\logs\laravel.log -Tail 30`.
+
+## Документация API
+
+- `docs/API.md`: описание всех эндпоинтов (роль, параметры, примеры запросов и ответов, коды ошибок).
+- `docs/api-docs.postman_collection.json`: коллекция Postman с описаниями и примерами ответов (импорт: Import, затем выбрать файл).
+- `docs/orders-scenario.postman_collection.json` и `docs/products-filters.postman_collection.json`: коллекции для ручной проверки сценариев.
+- `docs/test-cases.md`: таблица тест-кейсов.
+
+## Формат ошибок
+
+```json
+{"message": "Товар не найден"}
+{"message": "Ошибка валидации", "errors": {"price": ["Цена должна быть больше нуля"]}}
+```
+
+Коды: 401 (нет токена), 403 (нет прав), 404, 405, 409 (бизнес-правило или связанные записи), 422 (валидация), 500 (без стека и SQL).

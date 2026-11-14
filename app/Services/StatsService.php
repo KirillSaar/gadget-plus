@@ -57,11 +57,11 @@ class StatsService
         };
 
         $popular = Product::withSum(['orderItems as sold_quantity' => $inPeriod], 'quantity')
-            ->having('sold_quantity', '>', 0)
             ->orderByDesc('sold_quantity')
             ->orderBy('id')
             ->limit($limit)
             ->get()
+            ->filter(fn ($p) => (int) $p->sold_quantity > 0)
             ->map(fn ($p) => [
                 'id' => $p->id,
                 'name' => $p->name,

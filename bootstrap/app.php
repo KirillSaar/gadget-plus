@@ -8,6 +8,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -21,9 +22,14 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-      ->withMiddleware(function (Middleware $middleware): void {
+    ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
+        ]);
+
+        // Журналирование всех запросов к API
+        $middleware->api(append: [
+            \App\Http\Middleware\LogApiRequests::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -42,26 +48,37 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-	$exceptions->dontReport(BusinessException::class);
+        // Нарушение бизнес-правил: 409 (или код, указанный в исключении)
+        $exceptions->dontReport(BusinessException::class);
 
         $exceptions->render(function (BusinessException $e, Request $request) {
             if ($request->is('api/*')) {
+                Log::warning('Нарушено бизнес-правило', [
+                    'message' => $e->getMessage(),
+                    'user_id' => $request->user()?->id,
+                    'method' => $request->method(),
+                    'path' => $request->path(),
+                ]);
+
                 return response()->json(['message' => $e->getMessage()], $e->status());
             }
         });
 
+        // 401 — не авторизован
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json(['message' => 'Требуется авторизация'], 401);
             }
         });
 
+        // 403 — нет доступа
         $exceptions->render(function (AccessDeniedHttpException $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json(['message' => 'Доступ запрещён'], 403);
             }
         });
 
+        // 404 — запись или маршрут не найдены
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             if ($request->is('api/*')) {
                 $message = 'Маршрут не найден';
@@ -84,25 +101,30 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        // 405 — неверный HTTP-метод
         $exceptions->render(function (MethodNotAllowedHttpException $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json(['message' => 'Метод не поддерживается для этого адреса'], 405);
             }
         });
 
+        // Ошибки БД (MySQL и SQLite для тестов): 409, 422, иначе 500
         $exceptions->render(function (QueryException $e, Request $request) {
             if ($request->is('api/*')) {
                 $code = $e->errorInfo[1] ?? null;
+                $text = $e->getMessage();
+                $isForeignKey = str_contains($text, 'FOREIGN KEY constraint failed');
+                $isUnique = str_contains($text, 'UNIQUE constraint failed');
 
-                if ($code === 1451) {
+                if ($code === 1451 || ($isForeignKey && $request->isMethod('DELETE'))) {
                     return response()->json([
                         'message' => 'Нельзя удалить запись: на неё ссылаются другие записи',
                     ], 409);
                 }
-                if ($code === 1062) {
+                if ($code === 1062 || $isUnique) {
                     return response()->json(['message' => 'Запись с такими данными уже существует'], 422);
                 }
-                if ($code === 1452) {
+                if ($code === 1452 || $isForeignKey) {
                     return response()->json(['message' => 'Указана несуществующая связанная запись'], 422);
                 }
 
@@ -110,6 +132,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        // Прочие HTTP-ошибки (429 и т.д.)
         $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
             if ($request->is('api/*')) {
                 $status = $e->getStatusCode();
@@ -121,6 +144,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        // 500 — всё непредвиденное, без стека и SQL (подробности попадают в журнал)
         $exceptions->render(function (Throwable $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json(['message' => 'Внутренняя ошибка сервера'], 500);
