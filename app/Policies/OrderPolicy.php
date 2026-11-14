@@ -7,23 +7,24 @@ use App\Models\User;
 
 class OrderPolicy
 {
+    private function roleOf(User $user): ?string
+    {
+        return $user->role instanceof \BackedEnum ? $user->role->value : $user->role;
+    }
+
     private function isStaff(User $user): bool
     {
-        $role = $user->role instanceof \BackedEnum ? $user->role->value : $user->role;
-
-        return in_array($role, ['admin', 'manager'], true);
+        return in_array($this->roleOf($user), ['admin', 'manager'], true);
     }
 
     private function isAdmin(User $user): bool
     {
-        $role = $user->role instanceof \BackedEnum ? $user->role->value : $user->role;
-
-        return $role === 'admin';
+        return $this->roleOf($user) === 'admin';
     }
 
     public function viewAny(User $user): bool
     {
-        return true;
+        return true; // в списке пользователь видит только свои заказы (фильтр в сервисе)
     }
 
     public function view(User $user, Order $order): bool
