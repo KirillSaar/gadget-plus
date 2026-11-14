@@ -1,0 +1,22 @@
+// 1) В начало routes/api.php добавьте use:
+use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\CharacteristicController;
+use App\Http\Controllers\Api\ProductCharacteristicController;
+
+// 2) ПУБЛИЧНЫЕ маршруты (внутри Route::prefix('v1'), рядом с публичными GET /products):
+    Route::apiResource('brands', BrandController::class)->only(['index', 'show']);
+    Route::apiResource('characteristics', CharacteristicController::class)->only(['index', 'show']);
+    Route::get('products/{product}/characteristics', [ProductCharacteristicController::class, 'index'])
+        ->name('products.characteristics.index');
+
+// 3) ТОЛЬКО ДЛЯ АДМИНА: в ту же группу (auth:sanctum + проверка роли admin),
+//    где у вас уже лежат POST /products, PATCH /products/{product} и т. д.:
+    Route::apiResource('brands', BrandController::class)->only(['store', 'update', 'destroy']);
+    Route::apiResource('characteristics', CharacteristicController::class)->only(['store', 'update', 'destroy']);
+
+    Route::put('products/{product}/characteristics', [ProductCharacteristicController::class, 'sync'])
+        ->name('products.characteristics.sync');
+    Route::post('products/{product}/characteristics', [ProductCharacteristicController::class, 'attach'])
+        ->name('products.characteristics.attach');
+    Route::delete('products/{product}/characteristics/{characteristic}', [ProductCharacteristicController::class, 'detach'])
+        ->name('products.characteristics.detach');

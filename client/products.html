@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Каталог — Electronics Shop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <a class="brand" href="products.html">Electronics Shop</a>
+    <div id="user-bar"></div>
+  </header>
+  <main>
+    <h1>Каталог товаров</h1>
+
+    <form id="search-form" class="toolbar">
+      <input type="search" name="search" placeholder="Поиск по названию">
+      <button type="submit">Найти</button>
+    </form>
+
+    <p id="page-error" class="form-error"></p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Название</th><th>Категория</th><th>Бренд</th><th>Цена</th><th>Остаток</th></tr>
+        </thead>
+        <tbody id="products-body"></tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <button id="prev" type="button">Назад</button>
+      <span id="page-info"></span>
+      <button id="next" type="button">Вперёд</button>
+    </div>
+  </main>
+  <script type="module" src="js/products.js"></script>
+</body>
+</html>

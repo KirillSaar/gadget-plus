@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\CharacteristicController;
+use App\Http\Controllers\Api\ProductCharacteristicController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryController;
@@ -16,6 +19,10 @@ Route::prefix('v1')->name('v1.')->group(function () {
 
     Route::apiResource('products', ProductController::class)->only(['index', 'show']);
     Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
+    Route::apiResource('brands', BrandController::class)->only(['index', 'show']);
+    Route::apiResource('characteristics', CharacteristicController::class)->only(['index', 'show']);
+    Route::get('products/{product}/characteristics', [ProductCharacteristicController::class, 'index'])
+        ->name('products.characteristics.index');
 
     // ---------- Только для авторизованных ----------
     Route::middleware('auth:sanctum')->group(function () {
@@ -45,6 +52,17 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::middleware('role:admin')->group(function () {
             Route::apiResource('products', ProductController::class)->only(['destroy']);
             Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
+            
+            // Новые маршруты брендов, характеристик и связи
+            Route::apiResource('brands', BrandController::class)->only(['store', 'update', 'destroy']);
+            Route::apiResource('characteristics', CharacteristicController::class)->only(['store', 'update', 'destroy']);
+            
+            Route::put('products/{product}/characteristics', [ProductCharacteristicController::class, 'sync'])
+                ->name('products.characteristics.sync');
+            Route::post('products/{product}/characteristics', [ProductCharacteristicController::class, 'attach'])
+                ->name('products.characteristics.attach');
+            Route::delete('products/{product}/characteristics/{characteristic}', [ProductCharacteristicController::class, 'detach'])
+                ->name('products.characteristics.detach');
         });
     });
 });
